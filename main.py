@@ -9,18 +9,18 @@ WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Space Dodge")
 BG =pygame.transform.scale(pygame.image.load("./imgs/bg.jpeg"), (HEIGHT, WIDTH))
 
-# Size player
+
 PLAYER_WIDTH = 50
 PLAYER_HEIGHT = 60
 
-# PNG SPACESHIP
+
 SHIP_IMG = pygame.image.load("./imgs/spaceship.png")
 SHIP_IMG = pygame.transform.scale(SHIP_IMG, (PLAYER_WIDTH, PLAYER_HEIGHT))
 
-# PLAYER MOVEMENT SPEED PER FRAME
+
 PLAYER_VEL = 5
 
-# SIZE STAR
+
 STAR_WIDTH = 10
 STAR_HEIGHT = 20
 STAR_VEL = 3
@@ -41,17 +41,33 @@ def is_close(player_rect, star_rect, threshold):
     distance = math.hypot(player_center[0] - star_center[0], player_center[1] - star_center[1])
     return distance < threshold
 
+def is_far_enough(new_x, new_y, new_width, new_height, stars, min_distance=40):
+    new_center = (new_x + new_width // 2, new_y + new_height // 2)
+    for star in stars:
+        existing_center = star.rect.center
+        dist = math.hypot(new_center[0] - existing_center[0], new_center[1] - existing_center[1])
+        if dist < min_distance:
+            return False
+    return True
+
 class Star:
     def __init__(self, x, y, width, height, image_path):
-        self.image = pygame.image.load(image_path)
-        self.image = pygame.transform.scale(self.image, (width, height))
-        self.rect = pygame.Rect(x, y, width, height)
+        self.original_image = pygame.image.load(image_path).convert_alpha()
+        self.original_image = pygame.transform.scale(self.original_image, (width, height))
+        self.image = self.original_image
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+        self.angle = random.randint(0, 360)  # Góc xoay ban đầu
+        self.rotation_speed = random.choice([-5, -3, -2, 2, 3, 5])
 
     def draw(self, window):
-        window.blit(self.image, (self.rect.x, self.rect.y))
+        rotated_image = pygame.transform.rotate(self.original_image, self.angle)
+        new_rect = rotated_image.get_rect(center=self.rect.center)
+        window.blit(rotated_image, new_rect.topleft)
 
     def move(self, speed):
         self.rect.y += speed
+        
 
     def off_screen(self, screen_height):
         return self.rect.y > screen_height
@@ -74,8 +90,9 @@ class Explosion(pygame.sprite.Sprite):
 def draw(player, eLapsed_time, stars, player_visible):
     WIN.blit(BG, (0, 0))
 
-    time_text = FONT.render(f"Time: {round(eLapsed_time)}s", 1, "white")
-    WIN.blit(time_text, (10, 10))
+    if eLapsed_time is not None:
+        time_text = FONT.render(f"Time: {round(eLapsed_time)}s", 1, "white")
+        WIN.blit(time_text, (10, 10))
 
     if player_visible:
         WIN.blit(SHIP_IMG, (player.x, player.y))
@@ -85,15 +102,14 @@ def draw(player, eLapsed_time, stars, player_visible):
     
     pygame.display.update()
 
-def main():
-    run = True
-
+def run_game():
     player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
     player_visible = True
 
     clock = pygame.time.Clock()
     start_time = time.time()
     elapsed_time = 0
+    final_time = None
     start_add_increment = 2000
     start_count = 0
 
@@ -106,57 +122,78 @@ def main():
         (120, 120)
     )
 
-    while run:
+    while True:
         dt = clock.tick(60)
         start_count += dt
-        elapsed_time = time.time() - start_time
 
-        if start_count > start_add_increment:
-            for _ in range(5):
+        if not hit:
+            elapsed_time = time.time() - start_time
+        else:
+            if final_time is None:
+                final_time = elapsed_time  
+
+        if start_count > start_add_increment and not hit:
+            added = 0
+            max_stars_to_add = 5
+            max_attempts = 100
+            attempts = 0
+
+            while added < max_stars_to_add and attempts < max_attempts:
                 variant = random.choice(STAR_VARIANTS)
                 star_x = random.randint(0, WIDTH - variant["width"])
-                star = Star(star_x, -variant["height"], variant["width"], variant["height"], variant["image"])
-                stars.append(star)
-            
+                star_y = -variant["height"]
+
+                if is_far_enough(star_x, star_y, variant["width"], variant["height"], stars, min_distance=50):
+                    star = Star(star_x, star_y, variant["width"], variant["height"], variant["image"])
+                    stars.append(star)
+                    added += 1
+
+                attempts += 1
+
             start_add_increment = max(200, start_add_increment - 50)
             start_count = 0
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
-                break
+                return False
+            if hit and event.type == pygame.MOUSEBUTTONDOWN:
+                return True
 
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFT] and player.x - PLAYER_VEL >= 0:
-            player.x -= PLAYER_VEL
-        if keys[pygame.K_RIGHT] and player.x + PLAYER_VEL + player.width <= WIDTH:
-            player.x += PLAYER_VEL
+        if not hit:
+            if keys[pygame.K_LEFT] and player.x - PLAYER_VEL >= 0:
+                player.x -= PLAYER_VEL
+            if keys[pygame.K_RIGHT] and player.x + PLAYER_VEL + player.width <= WIDTH:
+                player.x += PLAYER_VEL
 
         for star in stars[:]:
             star.move(STAR_VEL)
             if star.off_screen(HEIGHT):
                 stars.remove(star)
-            elif is_close(player, star.rect, threshold= 40):
+            elif is_close(player, star.rect, threshold=40):    
                 stars.remove(star)
                 hit = True
-
                 explosion = Explosion(star.rect.center, explosion_img)
                 all_sprites.add(explosion)
                 break
 
+
+        draw(player, final_time if hit else elapsed_time, stars, player_visible)
+
         if hit:
             player_visible = False
-            draw(player, elapsed_time, stars, player_visible)
             all_sprites.update()
             all_sprites.draw(WIN)
-            lost_text = FONT.render("YOU LOST", 1, "white")
+            lost_text = FONT.render("YOU LOST - Click to Retry", 1, "white")
             WIN.blit(lost_text, (WIDTH/2 - lost_text.get_width()/2, HEIGHT/2 - lost_text.get_height()/2))    
             pygame.display.update()
-            pygame.time.delay(4000)
+
+def main():
+    pygame.init()
+    while True:
+        play_again = run_game()
+        if not play_again:
             break
-
-        draw(player, elapsed_time, stars, player_visible)
-
     pygame.quit()
 
 if __name__ == "__main__":
