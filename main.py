@@ -24,7 +24,7 @@ SHIP_IMG = pygame.image.load("./imgs/spaceship.png")
 SHIP_IMG = pygame.transform.scale(SHIP_IMG, (PLAYER_WIDTH, PLAYER_HEIGHT))
 
 
-PLAYER_VEL = 5
+PLAYER_VEL = 4
 
 
 STAR_WIDTH = 10
@@ -116,7 +116,6 @@ def run_game():
     start_time = time.time()
     elapsed_time = 0
     final_time = None
-    start_add_increment = 2000
     start_count = 0
 
     stars = []
@@ -128,6 +127,11 @@ def run_game():
         (120, 120)
     )
 
+    difficulty_timer = time.time()
+    star_speed = STAR_VEL
+    player_speed = PLAYER_VEL
+    spawn_interval = 4000
+
     while True:
         dt = clock.tick(60)
         start_count += dt
@@ -138,9 +142,24 @@ def run_game():
             if final_time is None:
                 final_time = elapsed_time  
 
-        if start_count > start_add_increment and not hit:
+        # Tăng độ khó mỗi 30 giây
+        if time.time() - difficulty_timer >= 30:
+            difficulty_timer = time.time()
+
+            # Tăng tốc độ rơi
+            star_speed += 1
+
+            # Giảm thời gian spawn (tối thiểu 700ms)
+            spawn_interval = max(1000, spawn_interval - 150)
+
+            # Tăng tốc độ player (tối đa 10)
+            player_speed = min(10, player_speed + 1)
+
+            print(f"[+] Tăng độ khó! Star speed: {star_speed}, Spawn interval: {spawn_interval}ms, Player speed: {player_speed}")
+
+        if start_count > spawn_interval and not hit:
             added = 0
-            max_stars_to_add = 5
+            max_stars_to_add = random.randint(3, 8)
             max_attempts = 100
             attempts = 0
 
@@ -156,7 +175,7 @@ def run_game():
 
                 attempts += 1
 
-            start_add_increment = max(200, start_add_increment - 50)
+            spawn_interval = max(200, spawn_interval - 50)
             start_count = 0
 
         for event in pygame.event.get():
@@ -167,13 +186,13 @@ def run_game():
 
         keys = pygame.key.get_pressed()
         if not hit:
-            if keys[pygame.K_LEFT] and player.x - PLAYER_VEL >= 0:
+            if keys[pygame.K_LEFT] and player.x - player_speed >= 0:
                 player.x -= PLAYER_VEL
-            if keys[pygame.K_RIGHT] and player.x + PLAYER_VEL + player.width <= WIDTH:
+            if keys[pygame.K_RIGHT] and player.x + player_speed + player.width <= WIDTH:
                 player.x += PLAYER_VEL
 
         for star in stars[:]:
-            star.move(STAR_VEL)
+            star.move(star_speed)
             if star.off_screen(HEIGHT):
                 stars.remove(star)
             elif not hit and is_close(player, star.rect, threshold=40):
