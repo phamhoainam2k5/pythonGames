@@ -2,7 +2,13 @@ import pygame
 import time
 import random
 import math
+
 pygame.font.init()
+
+pygame.mixer.init()
+pygame.mixer.music.load("./sounds/bg_sound.mp3")
+pygame.mixer.music.set_volume(0.1)
+pygame.mixer.music.play(-1)
 
 WIDTH, HEIGHT = 800, 800
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -170,22 +176,28 @@ def run_game():
             star.move(STAR_VEL)
             if star.off_screen(HEIGHT):
                 stars.remove(star)
-            elif is_close(player, star.rect, threshold=40):    
+            elif not hit and is_close(player, star.rect, threshold=40):
                 stars.remove(star)
                 hit = True
+                explosion_sound = pygame.mixer.Sound("./sounds/explosion_sound.mp3")
+                explosion_sound.set_volume(0.7)
+                explosion_sound.play()
                 explosion = Explosion(star.rect.center, explosion_img)
                 all_sprites.add(explosion)
                 break
 
-
         draw(player, final_time if hit else elapsed_time, stars, player_visible)
 
         if hit:
+            current_volume = pygame.mixer.music.get_volume()
             player_visible = False
             all_sprites.update()
             all_sprites.draw(WIN)
             lost_text = FONT.render("YOU LOST - Click to Retry", 1, "white")
-            WIN.blit(lost_text, (WIDTH/2 - lost_text.get_width()/2, HEIGHT/2 - lost_text.get_height()/2))    
+            WIN.blit(lost_text, (WIDTH/2 - lost_text.get_width()/2, HEIGHT/2 - lost_text.get_height()/2))
+            if current_volume > 0:
+                new_volume = max(0, current_volume - 0.005)
+                pygame.mixer.music.set_volume(new_volume)
             pygame.display.update()
 
 def main():
@@ -194,6 +206,10 @@ def main():
         play_again = run_game()
         if not play_again:
             break
+        else:
+            pygame.mixer.music.set_volume(0.1)
+            pygame.mixer.music.play(-1)
+    pygame.mixer.music.stop()
     pygame.quit()
 
 if __name__ == "__main__":
