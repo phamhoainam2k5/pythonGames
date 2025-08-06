@@ -2,13 +2,14 @@ import pygame
 import time
 import random
 import math
+import sys
 
 pygame.font.init()
 
 pygame.mixer.init()
-pygame.mixer.music.load("./sounds/bg_sound.mp3")
+pygame.mixer.music.load("./sounds/bg_start_sound.mp3")
 pygame.mixer.music.set_volume(0.1)
-pygame.mixer.music.play(-1)
+pygame.mixer.music.play(-1, fade_ms=2000)
 
 WIDTH, HEIGHT = 800, 800
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -39,6 +40,32 @@ STAR_VARIANTS = [
 ]
 
 FONT = pygame.font.SysFont("comicsans", 30)
+
+def main_menu():
+    font = pygame.font.SysFont("comicsans", 60)
+    button_color = (0, 200, 0)
+    text_color = (255, 255, 255)
+    bg_color = (0, 0, 30)
+
+    while True:
+        WIN.fill(bg_color)
+        title_text = font.render("SPACE DODGE", True, text_color)
+        WIN.blit(title_text, (WIDTH//2 - title_text.get_width()//2, HEIGHT//3))
+
+        start_text = font.render("START", True, text_color)
+        start_rect = start_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        pygame.draw.rect(WIN, button_color, start_rect.inflate(40, 20))
+        WIN.blit(start_text, start_rect)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if start_rect.collidepoint(event.pos):
+                    return  # Bắt đầu game
+
+        pygame.display.update()
 
 def is_close(player_rect, star_rect, threshold):
     player_center = player_rect.center
@@ -109,7 +136,7 @@ def draw(player, eLapsed_time, stars, player_visible):
     pygame.display.update()
 
 def run_game():
-    player = pygame.Rect(200, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
+    player = pygame.Rect(WIDTH // 2 - PLAYER_WIDTH // 2, HEIGHT - PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT)
     player_visible = True
 
     clock = pygame.time.Clock()
@@ -221,6 +248,7 @@ def run_game():
 
 def main():
     pygame.init()
+    main_menu()
     while True:
         play_again = run_game()
         if not play_again:
